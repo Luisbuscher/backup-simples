@@ -162,6 +162,49 @@ describe("BackupService", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
+  it("não executa o dump quando a autorização do Drive está inválida", async () => {
+    const database = target();
+    const repository = new FakeRepository(database);
+    const root = await mkdtemp(join(tmpdir(), "backup-service-test-"));
+    roots.push(root);
+    const dumpRunner = vi.fn();
+    const driveUploader = vi.fn() as ReturnType<typeof vi.fn> & {
+      verifyAccess: () => Promise<void>;
+    };
+    driveUploader.verifyAccess = vi.fn(async () => {
+      throw new Error("autorização inválida");
+    });
+    const service = new BackupService({
+      repository,
+      dumpRunner,
+      driveUploader,
+      config: {
+        google: {
+          clientId: "",
+          clientSecret: "",
+          refreshToken: "",
+          rootFolderId: "root-folder",
+        },
+        timeZone: "America/Sao_Paulo",
+      },
+      tempRoot: root,
+      logger: { error: vi.fn() },
+    });
+
+    await service.start(database.id, "manual");
+    await waitUntil(
+      () =>
+        repository.runs[0].status !== "running" &&
+        !service.isRunning(database.id),
+    );
+
+    expect(driveUploader.verifyAccess).toHaveBeenCalledOnce();
+    expect(dumpRunner).not.toHaveBeenCalled();
+    expect(driveUploader).not.toHaveBeenCalled();
+    expect(repository.runs[0].errorMessage).toBe("autorização inválida");
+    expect(await readdir(root)).toEqual([]);
+  });
+
   it("remove senhas de mensagens de erro", () => {
     expect(
       sanitizeError(

@@ -34,6 +34,10 @@ quando possível.
 > publique o aplicativo como **In production** e cumpra os requisitos mostrados
 > pelo Google, ou use um projeto Interno elegível.
 
+Faça essa publicação **antes** de gerar o token usado em produção. Publicar o
+aplicativo não reativa um token que já expirou: nesse caso, gere outro refresh
+token depois da mudança de status.
+
 ## 3. Criar as credenciais OAuth
 
 1. Abra **APIs e serviços → Credenciais**.
@@ -90,6 +94,41 @@ GOOGLE_DRIVE_ROOT_FOLDER_ID=id-da-pasta-geral
 ```
 
 Não versione esse arquivo e não compartilhe o client secret ou o refresh token.
+
+## 7. Verificar a autorização
+
+O comando abaixo testa somente a renovação da autorização; ele não cria nem
+envia arquivos:
+
+```bash
+cd backend
+npm run build
+npm run google:check
+```
+
+Com Docker Compose, use:
+
+```bash
+docker compose run --rm backend npm run google:check
+```
+
+Se aparecer a mensagem de que a autorização expirou ou foi revogada:
+
+1. No Google Auth Platform, abra **Público-alvo (Audience)**.
+2. Se o tipo for **Externo** e o status for **Teste (Testing)**, clique em
+   **Publicar app (Publish app)** para mudar para **Em produção**. Para uma
+   organização Google Workspace elegível, também é possível usar o tipo
+   **Interno**.
+3. Repita o procedimento da seção 4 para gerar um novo refresh token.
+4. Substitua `GOOGLE_REFRESH_TOKEN` no `.env` do ambiente de produção.
+5. Recrie o backend para que ele carregue a nova variável:
+
+   ```bash
+   docker compose up -d --build --force-recreate backend
+   ```
+
+6. Execute novamente `npm run google:check` e refaça manualmente os backups
+   perdidos. Agendamentos passados não são reprocessados automaticamente.
 
 ## Referências oficiais
 

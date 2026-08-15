@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "google:check": "node dist/scripts/checkGoogleDrive.js"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",

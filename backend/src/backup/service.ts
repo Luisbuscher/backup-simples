@@ -94,6 +94,7 @@ export class BackupService {
     let runDirectory: string | null = null;
 
     try {
+      await this.options.driveUploader.verifyAccess?.();
       await mkdir(this.tempRoot, { recursive: true });
       runDirectory = await mkdtemp(join(this.tempRoot, `${run.id}-`));
       const outputPath = join(runDirectory, run.fileName);
