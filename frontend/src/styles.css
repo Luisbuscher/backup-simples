@@ -228,6 +228,25 @@ h2 {
   font-size: 1.65rem;
 }
 
+.name-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.auth-switch {
+  padding: 0.2rem;
+  border: 0;
+  color: var(--green-dark);
+  background: transparent;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.auth-switch:hover {
+  text-decoration: underline;
+}
+
 label,
 .field-label {
   display: grid;
@@ -342,6 +361,16 @@ input:focus {
   background: transparent;
 }
 
+.success-alert {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(0, 168, 132, 0.3);
+  border-radius: 9px;
+  color: #08745f;
+  background: rgba(0, 168, 132, 0.09);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .app-shell {
   min-height: 100vh;
 }
@@ -369,6 +398,50 @@ input:focus {
   align-items: flex-end;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.drive-card {
+  display: flex;
+  min-height: 82px;
+  padding: 1rem 1.2rem;
+  align-items: center;
+  gap: 0.9rem;
+  border: 1px solid #dce4e9;
+  border-radius: 14px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+
+.drive-card-icon {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  color: #687888;
+  background: #edf2f5;
+}
+
+.drive-connected .drive-card-icon {
+  color: var(--green-dark);
+  background: var(--green-light);
+}
+
+.drive-card-copy {
+  display: grid;
+  flex: 1;
+  gap: 0.2rem;
+}
+
+.drive-card-copy strong {
+  color: var(--navy);
+  font-size: 0.94rem;
+}
+
+.drive-card-copy span {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .stats-grid {
@@ -938,6 +1011,15 @@ legend {
     display: none;
   }
 
+  .drive-card {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .drive-card .button {
+    width: 100%;
+  }
+
   .stats-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -981,6 +1063,10 @@ legend {
 }
 
 @media (max-width: 520px) {
+
+  .name-grid {
+    grid-template-columns: 1fr;
+  }
   .topbar .button span {
     display: none;
   }
@@ -1200,6 +1286,12 @@ input:focus {
   background: rgba(151, 40, 61, 0.16);
 }
 
+.success-alert {
+  border-color: rgba(37, 201, 155, 0.28);
+  color: #70e2c3;
+  background: rgba(37, 201, 155, 0.1);
+}
+
 .topbar {
   position: sticky;
   z-index: 5;
@@ -1218,9 +1310,15 @@ input:focus {
 }
 
 .stat-card,
-.panel {
+.panel,
+.drive-card {
   border-color: var(--border);
   background: linear-gradient(145deg, #0f1e29, #0c1923);
+}
+
+.drive-card-icon {
+  color: #8eafc1;
+  background: #172a36;
 }
 
 .stat-card {

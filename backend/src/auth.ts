@@ -1,40 +1,47 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import type { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import type { AppConfig } from "./config.js";
 
 export const SESSION_COOKIE = "backup_session";
+const ISSUER = "backup-simples";
 
-function safeEqual(left: string, right: string) {
-  const leftHash = createHash("sha256").update(left).digest();
-  const rightHash = createHash("sha256").update(right).digest();
-  return timingSafeEqual(leftHash, rightHash);
+export interface SessionUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
 }
 
-export function credentialsAreValid(
-  username: string,
-  password: string,
-  config: AppConfig,
-) {
-  return (
-    safeEqual(username, config.admin.user) &&
-    safeEqual(password, config.admin.password)
+export function createSessionToken(user: SessionUser, config: AppConfig) {
+  return jwt.sign(
+    {
+      type: "session",
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+    },
+    config.jwtSecret,
+    { subject: user.id, issuer: ISSUER, expiresIn: "8h" },
   );
 }
 
-export function createSessionToken(config: AppConfig) {
-  return jwt.sign({ role: "admin" }, config.jwtSecret, {
-    subject: config.admin.user,
-    issuer: "backup-simples",
-    expiresIn: "8h",
+export function createGoogleOAuthState(userId: string, config: AppConfig) {
+  return jwt.sign({ type: "google_oauth" }, config.jwtSecret, {
+    subject: userId,
+    issuer: ISSUER,
+    expiresIn: "10m",
   });
 }
 
-export function setSessionCookie(
-  response: Response,
-  token: string,
-  config: AppConfig,
-) {
+export function readGoogleOAuthState(state: string, config: AppConfig) {
+  const payload = jwt.verify(state, config.jwtSecret, { issuer: ISSUER });
+  if (typeof payload === "string" || payload.type !== "google_oauth" || !payload.sub) {
+    throw new Error("Estado OAuth inválido");
+  }
+  return payload.sub;
+}
+
+export function setSessionCookie(response: Response, token: string, config: AppConfig) {
   response.cookie(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "strict",
@@ -62,10 +69,23 @@ export function requireAuth(config: AppConfig) {
     }
 
     try {
-      jwt.verify(token, config.jwtSecret, {
-        issuer: "backup-simples",
-        subject: config.admin.user,
-      });
+      const payload = jwt.verify(token, config.jwtSecret, { issuer: ISSUER });
+      if (
+        typeof payload === "string" ||
+        payload.type !== "session" ||
+        !payload.sub ||
+        typeof payload.email !== "string" ||
+        typeof payload.firstName !== "string" ||
+        typeof payload.lastName !== "string"
+      ) {
+        throw new Error("Sessão inválida");
+      }
+      response.locals.user = {
+        id: payload.sub,
+        email: payload.email,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+      } satisfies SessionUser;
       next();
     } catch {
       clearSessionCookie(response, config);
@@ -74,3 +94,6 @@ export function requireAuth(config: AppConfig) {
   };
 }
 
+export function authenticatedUser(response: Response): SessionUser {
+  return response.locals.user as SessionUser;
+}

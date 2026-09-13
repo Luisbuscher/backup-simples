@@ -1,9 +1,9 @@
 import {
   CalendarDays,
   CheckCircle2,
+  Cloud,
   Clock3,
   Database,
-  FolderOpen,
   HardDriveUpload,
   LoaderCircle,
   LogOut,
@@ -27,8 +27,10 @@ import {
 import { api, ApiError } from "./api";
 import type {
   BackupRun,
+  AuthUser,
   DatabasePayload,
   DatabaseTarget,
+  GoogleDriveStatus,
   WeekDay,
 } from "./types";
 
@@ -47,21 +49,19 @@ function errorMessage(error: unknown) {
 }
 
 export function App() {
-  const [session, setSession] = useState<"loading" | "authenticated" | "guest">(
-    "loading",
-  );
+  const [session, setSession] = useState<AuthUser | "loading" | null>("loading");
 
   useEffect(() => {
-    api<{ user: string }>("/api/auth/me")
-      .then(() => setSession("authenticated"))
-      .catch(() => setSession("guest"));
+    api<{ user: AuthUser }>("/api/auth/me")
+      .then(({ user }) => setSession(user))
+      .catch(() => setSession(null));
   }, []);
 
   if (session === "loading") return <PageLoader />;
-  if (session === "guest") {
-    return <Login onAuthenticated={() => setSession("authenticated")} />;
+  if (!session) {
+    return <Login onAuthenticated={setSession} />;
   }
-  return <Dashboard onLoggedOut={() => setSession("guest")} />;
+  return <Dashboard user={session} onLoggedOut={() => setSession(null)} />;
 }
 
 function PageLoader() {
@@ -75,23 +75,62 @@ function PageLoader() {
   );
 }
 
-function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
-  const [username, setUsername] = useState("");
+function Login({ onAuthenticated }: { onAuthenticated: (user: AuthUser) => void }) {
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get("email-confirmed");
+    if (value === "1") return "E-mail confirmado. Sua conta está pronta para entrar.";
+    if (value === "error") return "O link de confirmação é inválido ou expirou.";
+    return "";
+  });
+  const [canResend, setCanResend] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
+    setCanResend(false);
     try {
-      await api("/api/auth/login", {
+      if (mode === "register") {
+        const result = await api<{ message: string }>("/api/auth/register", {
+          method: "POST",
+          body: JSON.stringify({ firstName, lastName, email, password }),
+        });
+        setSuccess(result.message);
+        setPassword("");
+        return;
+      }
+      const result = await api<{ user: AuthUser }>("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ email, password }),
       });
       setPassword("");
-      onAuthenticated();
+      onAuthenticated(result.user);
+    } catch (requestError) {
+      setError(errorMessage(requestError));
+      setCanResend(requestError instanceof ApiError && requestError.status === 403);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resendConfirmation() {
+    setLoading(true);
+    setError("");
+    try {
+      const result = await api<{ message: string }>("/api/auth/resend-confirmation", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+      setSuccess(result.message);
+      setCanResend(false);
     } catch (requestError) {
       setError(errorMessage(requestError));
     } finally {
@@ -119,25 +158,68 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
           </div>
           <div className="secure-note">
             <ShieldCheck size={20} />
-            <span>Acesso exclusivo do administrador</span>
+            <span>Dados isolados e protegidos por conta</span>
           </div>
         </div>
 
         <div className="login-form-panel">
           <form onSubmit={submit} className="login-form">
             <div>
-              <p className="eyebrow eyebrow-dark">ACESSO ADMINISTRATIVO</p>
-              <h2>Entre no painel</h2>
-              <p className="muted">Use as credenciais configuradas no servidor.</p>
+              <p className="eyebrow eyebrow-dark">
+                {mode === "login" ? "ACESSO SEGURO" : "NOVA CONTA"}
+              </p>
+              <h2>{mode === "login" ? "Entre no painel" : "Crie sua conta"}</h2>
+              <p className="muted">
+                {mode === "login"
+                  ? "Use seu e-mail e senha para continuar."
+                  : "Enviaremos uma confirmação para o seu e-mail."}
+              </p>
             </div>
             {error && <Alert>{error}</Alert>}
+            {success && <div className="success-alert">{success}</div>}
+            {canResend && (
+              <button
+                type="button"
+                className="button button-secondary button-wide"
+                onClick={resendConfirmation}
+                disabled={loading || !email}
+              >
+                Reenviar e-mail de confirmação
+              </button>
+            )}
+            {mode === "register" && (
+              <div className="name-grid">
+                <label>
+                  Nome
+                  <input
+                    autoFocus
+                    autoComplete="given-name"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    required
+                    maxLength={100}
+                  />
+                </label>
+                <label>
+                  Sobrenome
+                  <input
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    required
+                    maxLength={100}
+                  />
+                </label>
+              </div>
+            )}
             <label>
-              Usuário
+              E-mail
               <input
-                autoFocus
-                autoComplete="username"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
+                autoFocus={mode === "login"}
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 required
               />
             </label>
@@ -145,15 +227,32 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
               Senha
               <input
                 type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "login" ? "current-password" : "new-password"}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
+                minLength={mode === "register" ? 8 : undefined}
               />
             </label>
             <button className="button button-primary button-wide" disabled={loading}>
               {loading && <LoaderCircle className="spin" size={18} />}
-              {loading ? "Entrando..." : "Entrar"}
+              {loading
+                ? mode === "login" ? "Entrando..." : "Criando..."
+                : mode === "login" ? "Entrar" : "Criar conta"}
+            </button>
+            <button
+              type="button"
+              className="auth-switch"
+              onClick={() => {
+                setMode(mode === "login" ? "register" : "login");
+                setError("");
+                setSuccess("");
+                setPassword("");
+              }}
+            >
+              {mode === "login"
+                ? "Ainda não tem conta? Criar conta"
+                : "Já tem uma conta? Entrar"}
             </button>
           </form>
         </div>
@@ -162,24 +261,42 @@ function Login({ onAuthenticated }: { onAuthenticated: () => void }) {
   );
 }
 
-function Dashboard({ onLoggedOut }: { onLoggedOut: () => void }) {
+function Dashboard({
+  user,
+  onLoggedOut,
+}: {
+  user: AuthUser;
+  onLoggedOut: () => void;
+}) {
   const [databases, setDatabases] = useState<DatabaseTarget[]>([]);
   const [backups, setBackups] = useState<BackupRun[]>([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState(() => {
+    const googleResult = new URLSearchParams(window.location.search).get("google");
+    if (googleResult === "error") return "Não foi possível conectar o Google Drive. Tente novamente.";
+    return "";
+  });
   const [editing, setEditing] = useState<DatabaseTarget | "new" | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [drive, setDrive] = useState<GoogleDriveStatus>({
+    connected: false,
+    email: null,
+    connectedAt: null,
+  });
+  const [driveBusy, setDriveBusy] = useState(false);
 
   const loadData = useCallback(
     async (quiet = false) => {
       if (!quiet) setLoading(true);
       try {
-        const [databaseData, backupData] = await Promise.all([
+        const [databaseData, backupData, driveData] = await Promise.all([
           api<DatabaseTarget[]>("/api/databases"),
           api<BackupRun[]>("/api/backups?limit=50"),
+          api<GoogleDriveStatus>("/api/google/status"),
         ]);
         setDatabases(databaseData);
         setBackups(backupData);
+        setDrive(driveData);
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) {
           onLoggedOut();
@@ -228,6 +345,33 @@ function Dashboard({ onLoggedOut }: { onLoggedOut: () => void }) {
         next.delete(database.id);
         return next;
       });
+    }
+  }
+
+  async function connectDrive() {
+    setDriveBusy(true);
+    setMessage("");
+    try {
+      const { url } = await api<{ url: string }>("/api/google/connect", {
+        method: "POST",
+      });
+      window.location.assign(url);
+    } catch (error) {
+      setMessage(errorMessage(error));
+      setDriveBusy(false);
+    }
+  }
+
+  async function disconnectDrive() {
+    if (!window.confirm("Desconectar o Google Drive? Os agendamentos não poderão executar até uma nova conexão.")) return;
+    setDriveBusy(true);
+    try {
+      await api("/api/google/connection", { method: "DELETE" });
+      await loadData(true);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setDriveBusy(false);
     }
   }
 
@@ -280,7 +424,7 @@ function Dashboard({ onLoggedOut }: { onLoggedOut: () => void }) {
         </div>
         <button className="button button-quiet" onClick={logout}>
           <LogOut size={17} />
-          <span>Sair</span>
+          <span>{user.firstName} · Sair</span>
         </button>
       </header>
 
@@ -305,6 +449,28 @@ function Dashboard({ onLoggedOut }: { onLoggedOut: () => void }) {
         {message && (
           <Alert onClose={() => setMessage("")}>{message}</Alert>
         )}
+
+        <section className={`drive-card ${drive.connected ? "drive-connected" : ""}`}>
+          <div className="drive-card-icon"><Cloud size={23} /></div>
+          <div className="drive-card-copy">
+            <strong>{drive.connected ? "Google Drive conectado" : "Conecte seu Google Drive"}</strong>
+            <span>
+              {drive.connected
+                ? `${drive.email ?? "Conta Google"} · backups enviados para a pasta Backup Simples`
+                : "Autorize sua conta para executar backups manuais e agendados."}
+            </span>
+          </div>
+          {drive.connected ? (
+            <button className="button button-quiet" disabled={driveBusy} onClick={disconnectDrive}>
+              Desconectar
+            </button>
+          ) : (
+            <button className="button button-primary" disabled={driveBusy} onClick={connectDrive}>
+              {driveBusy && <LoaderCircle className="spin" size={17} />}
+              Conectar Google Drive
+            </button>
+          )}
+        </section>
 
         <section className="stats-grid" aria-label="Resumo">
           <StatCard
@@ -377,15 +543,15 @@ function Dashboard({ onLoggedOut }: { onLoggedOut: () => void }) {
                     <div className="database-meta folder-meta">
                       <span className="meta-label">Google Drive</span>
                       <span>
-                        <FolderOpen size={14} />
-                        {database.driveFolderId ? "Pasta específica" : "Pasta raiz"}
+                        <Cloud size={14} />
+                        Pasta Backup Simples
                       </span>
                     </div>
                     <div className="row-actions">
                       <button
                         className="button button-secondary"
                         onClick={() => runBackup(database)}
-                        disabled={running || busy}
+                        disabled={running || busy || !drive.connected}
                         title="Executar backup agora"
                       >
                         {running || busy ? (
@@ -470,7 +636,6 @@ function DatabaseModal({
     database: database?.databaseName ?? "",
     username: database?.username ?? "",
     password: "",
-    driveFolderId: database?.driveFolderId ?? "",
     schedule: {
       enabled: database?.schedule.enabled ?? false,
       days: database?.schedule.days ?? [],
@@ -506,7 +671,6 @@ function DatabaseModal({
     try {
       const payload: DatabasePayload = {
         ...form,
-        driveFolderId: form.driveFolderId?.trim() || null,
         schedule: {
           ...form.schedule,
           time: form.schedule.enabled ? form.schedule.time : null,
@@ -623,24 +787,6 @@ function DatabaseModal({
                 )}
               </label>
             </div>
-          </fieldset>
-
-          <fieldset>
-            <legend>Destino no Google Drive</legend>
-            <label>
-              ID da pasta
-              <input
-                value={form.driveFolderId ?? ""}
-                onChange={(event) =>
-                  setField("driveFolderId", event.target.value)
-                }
-                placeholder="Deixe vazio para usar a pasta raiz"
-                maxLength={255}
-              />
-              <span className="field-help">
-                O ID fica no final da URL da pasta no Google Drive.
-              </span>
-            </label>
           </fieldset>
 
           <fieldset>
@@ -870,4 +1016,3 @@ function relativeDate(value: string | null) {
     return `há ${Math.floor(difference / 3_600_000)} h`;
   return formatDate(value).split(" ")[0];
 }
-

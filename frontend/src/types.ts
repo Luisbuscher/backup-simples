@@ -7,7 +7,6 @@ export interface DatabaseTarget {
   port: number;
   databaseName: string;
   username: string;
-  driveFolderId: string | null;
   schedule: {
     enabled: boolean;
     days: WeekDay[];
@@ -40,7 +39,6 @@ export interface DatabasePayload {
   database: string;
   username: string;
   password?: string;
-  driveFolderId: string | null;
   schedule: {
     enabled: boolean;
     days: WeekDay[];
@@ -48,3 +46,15 @@ export interface DatabasePayload {
   };
 }
 
+export interface AuthUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
+export interface GoogleDriveStatus {
+  connected: boolean;
+  email: string | null;
+  connectedAt: string | null;
+}

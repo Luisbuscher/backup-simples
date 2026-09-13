@@ -38,13 +38,6 @@ const baseDatabaseSchema = z.object({
   port: z.coerce.number().int().min(1).max(65535),
   database: z.string().trim().min(1).max(120),
   username: z.string().trim().min(1).max(120),
-  driveFolderId: z
-    .string()
-    .trim()
-    .max(255)
-    .nullable()
-    .optional()
-    .transform((value) => value || null),
   schedule: scheduleSchema,
 });
 
@@ -57,9 +50,19 @@ export const updateDatabaseSchema = baseDatabaseSchema.extend({
 });
 
 export const loginSchema = z.object({
-  username: z.string().min(1).max(255),
+  email: z.string().trim().toLowerCase().email().max(255),
   password: z.string().min(1).max(1024),
 });
 
-export const uuidSchema = z.string().uuid();
+export const registrationSchema = z.object({
+  firstName: z.string().trim().min(1).max(100),
+  lastName: z.string().trim().min(1).max(100),
+  email: z.string().trim().toLowerCase().email().max(255),
+  password: z.string().min(8, "A senha deve ter pelo menos 8 caracteres").max(1024),
+});
 
+export const confirmationSchema = z.object({
+  token: z.string().min(32).max(512),
+});
+
+export const uuidSchema = z.string().uuid();

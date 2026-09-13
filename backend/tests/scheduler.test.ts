@@ -8,6 +8,7 @@ import type { DatabaseTarget } from "../src/types.js";
 function scheduledTarget(): DatabaseTarget {
   return {
     id: randomUUID(),
+    userId: randomUUID(),
     name: "Produção",
     host: "db.example.com",
     port: 5432,
@@ -40,6 +41,7 @@ describe("BackupScheduler", () => {
     expect(start).toHaveBeenCalledOnce();
     expect(start).toHaveBeenCalledWith(
       target.id,
+      target.userId,
       "scheduled",
       new Date("2026-07-27T05:00:00.000Z"),
     );
@@ -63,4 +65,3 @@ describe("BackupScheduler", () => {
     expect(start).not.toHaveBeenCalled();
   });
 });
-

@@ -55,7 +55,12 @@ export class BackupScheduler {
 
     await Promise.allSettled(
       due.map((target) =>
-        this.backupService.start(target.id, "scheduled", scheduledFor),
+        this.backupService.start(
+          target.id,
+          target.userId,
+          "scheduled",
+          scheduledFor,
+        ),
       ),
     );
   }

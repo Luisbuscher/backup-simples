@@ -32,9 +32,23 @@ class FakeRepository implements BackupRepository {
     return id === this.target.id ? this.target : null;
   }
 
+  async getGoogleDriveConnection(userId: string) {
+    return userId === this.target.userId
+      ? {
+          userId,
+          refreshToken: "refresh-token",
+          rootFolderId: "root-folder",
+          googleEmail: "user@example.com",
+          connectedAt: new Date(),
+          updatedAt: new Date(),
+        }
+      : null;
+  }
+
   async createBackupRun(input: BackupRunCreate) {
     const run: BackupRun = {
       id: randomUUID(),
+      userId: input.userId,
       databaseId: input.databaseId,
       databaseName: input.databaseName,
       trigger: input.trigger,
@@ -67,6 +81,7 @@ class FakeRepository implements BackupRepository {
 function target(): DatabaseTarget {
   return {
     id: randomUUID(),
+    userId: randomUUID(),
     name: "Produção",
     host: "db.example.com",
     port: 5432,
@@ -98,21 +113,15 @@ describe("BackupService", () => {
     const service = new BackupService({
       repository,
       dumpRunner: async (_target, output) => writeFile(output, "dump"),
-      driveUploader: upload,
+      driveUploaderFactory: () => upload,
       config: {
-        google: {
-          clientId: "",
-          clientSecret: "",
-          refreshToken: "",
-          rootFolderId: "root-folder",
-        },
         timeZone: "America/Sao_Paulo",
       },
       tempRoot: root,
       logger: { error: vi.fn() },
     });
 
-    const run = await service.start(database.id, "manual");
+    const run = await service.start(database.id, database.userId, "manual");
     expect(run?.driveFolderId).toBe("root-folder");
     await waitUntil(
       () =>
@@ -136,21 +145,15 @@ describe("BackupService", () => {
       dumpRunner: async () => {
         throw new Error(`falha usando ${database.password}`);
       },
-      driveUploader: vi.fn(),
+      driveUploaderFactory: () => vi.fn(),
       config: {
-        google: {
-          clientId: "",
-          clientSecret: "",
-          refreshToken: "",
-          rootFolderId: "root-folder",
-        },
         timeZone: "America/Sao_Paulo",
       },
       tempRoot: root,
       logger: { error: vi.fn() },
     });
 
-    await service.start(database.id, "manual");
+    await service.start(database.id, database.userId, "manual");
     await waitUntil(
       () =>
         repository.runs[0].status !== "running" &&
@@ -177,21 +180,15 @@ describe("BackupService", () => {
     const service = new BackupService({
       repository,
       dumpRunner,
-      driveUploader,
+      driveUploaderFactory: () => driveUploader,
       config: {
-        google: {
-          clientId: "",
-          clientSecret: "",
-          refreshToken: "",
-          rootFolderId: "root-folder",
-        },
         timeZone: "America/Sao_Paulo",
       },
       tempRoot: root,
       logger: { error: vi.fn() },
     });
 
-    await service.start(database.id, "manual");
+    await service.start(database.id, database.userId, "manual");
     await waitUntil(
       () =>
         repository.runs[0].status !== "running" &&

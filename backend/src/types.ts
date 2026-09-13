@@ -20,6 +20,7 @@ export interface Schedule {
 
 export interface DatabaseTarget {
   id: string;
+  userId: string;
   name: string;
   host: string;
   port: number;
@@ -32,7 +33,7 @@ export interface DatabaseTarget {
   updatedAt: Date;
 }
 
-export type DatabaseTargetPublic = Omit<DatabaseTarget, "password"> & {
+export type DatabaseTargetPublic = Omit<DatabaseTarget, "password" | "userId"> & {
   hasPassword: boolean;
 };
 
@@ -43,12 +44,12 @@ export interface DatabaseInput {
   database: string;
   username: string;
   password?: string;
-  driveFolderId: string | null;
   schedule: Schedule;
 }
 
 export interface BackupRun {
   id: string;
+  userId: string;
   databaseId: string | null;
   databaseName: string;
   trigger: BackupTrigger;
@@ -62,3 +63,27 @@ export interface BackupRun {
   finishedAt: Date | null;
 }
 
+export interface User {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  passwordHash: string;
+  emailVerifiedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type UserPublic = Pick<
+  User,
+  "id" | "firstName" | "lastName" | "email" | "emailVerifiedAt"
+>;
+
+export interface GoogleDriveConnection {
+  userId: string;
+  refreshToken: string;
+  rootFolderId: string;
+  googleEmail: string | null;
+  connectedAt: Date;
+  updatedAt: Date;
+}

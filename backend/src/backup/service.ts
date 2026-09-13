@@ -8,7 +8,10 @@ import type {
 } from "../repository.js";
 import type { BackupRun, BackupTrigger, DatabaseTarget } from "../types.js";
 import { createBackupFileName } from "./filename.js";
-import type { DriveUploader } from "./googleDrive.js";
+import {
+  GoogleDriveNotConnectedError,
+  type DriveUploader,
+} from "./googleDrive.js";
 import type { DumpRunner } from "./pgDump.js";
 
 export class BackupAlreadyRunningError extends Error {}
@@ -17,8 +20,8 @@ export class DatabaseNotFoundError extends Error {}
 interface BackupServiceOptions {
   repository: BackupRepository;
   dumpRunner: DumpRunner;
-  driveUploader: DriveUploader;
-  config: Pick<AppConfig, "google" | "timeZone">;
+  driveUploaderFactory: (refreshToken: string) => DriveUploader;
+  config: Pick<AppConfig, "timeZone">;
   tempRoot?: string;
   logger?: Pick<Console, "error">;
 }
@@ -39,6 +42,7 @@ export class BackupService {
 
   async start(
     databaseId: string,
+    userId: string,
     trigger: BackupTrigger,
     scheduledFor: Date | null = null,
   ): Promise<BackupRun | null> {
@@ -51,8 +55,11 @@ export class BackupService {
 
     this.runningTargets.add(databaseId);
     try {
-      const target = await this.options.repository.getDatabase(databaseId);
+      const target = await this.options.repository.getDatabase(databaseId, userId);
       if (!target) throw new DatabaseNotFoundError("Banco não encontrado");
+      const driveConnection =
+        await this.options.repository.getGoogleDriveConnection(userId);
+      if (!driveConnection) throw new GoogleDriveNotConnectedError();
 
       const startedAt = new Date();
       const fileName = createBackupFileName(
@@ -60,9 +67,9 @@ export class BackupService {
         startedAt,
         this.options.config.timeZone,
       );
-      const driveFolderId =
-        target.driveFolderId ?? this.options.config.google.rootFolderId;
+      const driveFolderId = driveConnection.rootFolderId;
       const runInput: BackupRunCreate = {
+        userId,
         databaseId: target.id,
         databaseName: target.name,
         trigger,
@@ -77,7 +84,10 @@ export class BackupService {
         return null;
       }
 
-      void this.execute(run, target).catch((error) => {
+      const driveUploader = this.options.driveUploaderFactory(
+        driveConnection.refreshToken,
+      );
+      void this.execute(run, target, driveUploader).catch((error) => {
         this.logger.error(
           `Falha inesperada ao finalizar o backup ${run.id}:`,
           sanitizeError(error, target.password),
@@ -90,16 +100,20 @@ export class BackupService {
     }
   }
 
-  private async execute(run: BackupRun, target: DatabaseTarget) {
+  private async execute(
+    run: BackupRun,
+    target: DatabaseTarget,
+    driveUploader: DriveUploader,
+  ) {
     let runDirectory: string | null = null;
 
     try {
-      await this.options.driveUploader.verifyAccess?.();
+      await driveUploader.verifyAccess?.();
       await mkdir(this.tempRoot, { recursive: true });
       runDirectory = await mkdtemp(join(this.tempRoot, `${run.id}-`));
       const outputPath = join(runDirectory, run.fileName);
       await this.options.dumpRunner(target, outputPath);
-      const driveFileId = await this.options.driveUploader(
+      const driveFileId = await driveUploader(
         outputPath,
         run.fileName,
         run.driveFolderId,
