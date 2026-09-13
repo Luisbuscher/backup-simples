@@ -227,7 +227,7 @@ export class AppRepository implements BackupRepository {
         `INSERT INTO backup_databases (
           id, user_id, name, host, port, database_name, username, password,
           drive_folder_id, schedule_enabled, schedule_days, schedule_time
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NULL,$9,$10,$11)
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         RETURNING *`,
         [
           randomUUID(),
@@ -238,6 +238,7 @@ export class AppRepository implements BackupRepository {
           input.database,
           input.username,
           this.cipher.encrypt(input.password),
+          input.driveFolderId,
           input.schedule.enabled,
           input.schedule.days,
           input.schedule.time,
@@ -260,7 +261,8 @@ export class AppRepository implements BackupRepository {
           name = $3, host = $4, port = $5, database_name = $6,
           username = $7,
           password = COALESCE($8::text, password),
-          schedule_enabled = $9, schedule_days = $10, schedule_time = $11,
+          drive_folder_id = $9,
+          schedule_enabled = $10, schedule_days = $11, schedule_time = $12,
           updated_at = now()
         WHERE id = $2 AND user_id = $1
         RETURNING *`,
@@ -273,6 +275,7 @@ export class AppRepository implements BackupRepository {
           input.database,
           input.username,
           password,
+          input.driveFolderId,
           input.schedule.enabled,
           input.schedule.days,
           input.schedule.time,

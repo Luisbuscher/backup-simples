@@ -1,7 +1,8 @@
 # Google Drive por usuário
 
 O Backup Simples usa OAuth 2.0 para que cada usuário conecte sua própria conta.
-Não é necessário gerar refresh token nem informar ID de pasta manualmente.
+Não é necessário gerar refresh token. O ID de pasta é opcional: sem ele, a
+aplicação usa automaticamente a pasta **Backup Simples**.
 
 ## 1. Preparar o projeto Google
 
@@ -15,12 +16,15 @@ Não é necessário gerar refresh token nem informar ID de pasta manualmente.
 A aplicação solicita estes escopos:
 
 ```text
-https://www.googleapis.com/auth/drive.file
+https://www.googleapis.com/auth/drive
 https://www.googleapis.com/auth/userinfo.email
 ```
 
-`drive.file` permite gerenciar somente arquivos e pastas criados ou abertos
-pela aplicação, sem acesso geral ao conteúdo do Drive.
+O escopo `drive` é necessário para aceitar IDs de pastas existentes escolhidas
+pelo usuário. Ele é classificado pelo Google como restrito e pode exigir a
+verificação do aplicativo — e, conforme a forma de uso dos dados, uma avaliação
+de segurança — antes da disponibilização pública. Em modo de teste, mantenha os
+usuários autorizados cadastrados na tela de consentimento.
 
 ## 2. Criar as credenciais
 
@@ -49,6 +53,16 @@ Depois de confirmar o cadastro e entrar no sistema, clique em **Conectar Google
 Drive**. O consentimento solicita acesso offline, e a autorização fica
 criptografada no banco da aplicação. O sistema cria ou reutiliza a pasta
 **Backup Simples** automaticamente.
+
+Cada cadastro de banco também possui o campo opcional **ID da pasta**. Quando
+preenchido, os backups daquele banco são enviados para essa pasta; vazio, o
+destino continua sendo a pasta **Backup Simples** criada pela aplicação. O ID é
+o trecho que aparece depois de `/folders/` na URL do Google Drive. A conta
+conectada precisa poder adicionar arquivos na pasta.
+
+Ao atualizar uma instalação que já estava conectada usando apenas o escopo
+`drive.file`, clique em **Reconectar** e aceite a nova permissão antes de usar
+pastas personalizadas.
 
 Se a autorização expirar ou for revogada, o histórico registrará o erro e o
 usuário poderá reconectar pelo painel. Projetos OAuth externos em modo de teste

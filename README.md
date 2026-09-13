@@ -71,8 +71,8 @@ legados sem proprietário; as senhas legadas são criptografadas nessa operaçã
 - Tokens de confirmação são aleatórios, armazenados apenas como hash e expiram
   em 24 horas.
 - A sessão fica em cookie `HttpOnly` e `SameSite=Strict`.
-- A integração Google solicita somente `drive.file`, limitando o acesso aos
-  arquivos e pastas criados/abertos pela aplicação.
+- A integração Google solicita o escopo `drive` para permitir que o usuário
+  escolha uma pasta existente pelo ID. O refresh token continua criptografado.
 - Arquivos temporários são removidos após sucesso ou erro.
 
 ## Variáveis opcionais

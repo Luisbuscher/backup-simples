@@ -11,12 +11,14 @@ const validInput = {
   database: "app",
   username: "postgres",
   password: "secret",
+  driveFolderId: "",
   schedule: { enabled: true, days: ["mon"], time: "02:00" },
 };
 
 describe("database validation", () => {
-  it("aceita uma agenda completa", () => {
+  it("aceita uma agenda completa e converte pasta vazia em null", () => {
     const result = createDatabaseSchema.parse(validInput);
+    expect(result.driveFolderId).toBeNull();
     expect(result.schedule.time).toBe("02:00");
   });
 

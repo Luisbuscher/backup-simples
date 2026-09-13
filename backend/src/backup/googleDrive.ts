@@ -5,6 +5,7 @@ import type { AppConfig } from "../config.js";
 export interface DriveUploader {
   (filePath: string, fileName: string, folderId: string): Promise<string>;
   verifyAccess?: () => Promise<void>;
+  verifyFolderAccess?: (folderId: string) => Promise<void>;
 }
 
 export type DriveUploaderWithVerification = DriveUploader & {
@@ -49,7 +50,7 @@ export function createGoogleAuthorizationUrl(config: AppConfig, state: string) {
     include_granted_scopes: true,
     state,
     scope: [
-      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/drive",
       "https://www.googleapis.com/auth/userinfo.email",
     ],
   });
@@ -122,6 +123,7 @@ export function createDriveUploader(
           body: createReadStream(filePath),
         },
         fields: "id",
+        supportsAllDrives: true,
       });
       if (!response.data.id) throw new Error("O Google Drive não retornou o ID do arquivo");
       return response.data.id;
@@ -133,6 +135,27 @@ export function createDriveUploader(
   upload.verifyAccess = async () => {
     try {
       await auth.getAccessToken();
+    } catch (error) {
+      throw normalizeGoogleDriveError(error);
+    }
+  };
+
+  upload.verifyFolderAccess = async (folderId) => {
+    try {
+      const response = await drive.files.get({
+        fileId: folderId,
+        fields: "id,mimeType,trashed,capabilities(canAddChildren)",
+        supportsAllDrives: true,
+      });
+      if (
+        response.data.trashed ||
+        response.data.mimeType !== "application/vnd.google-apps.folder" ||
+        response.data.capabilities?.canAddChildren === false
+      ) {
+        throw new Error(
+          "A pasta configurada no Google Drive não existe ou não permite novos arquivos",
+        );
+      }
     } catch (error) {
       throw normalizeGoogleDriveError(error);
     }

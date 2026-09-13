@@ -444,6 +444,12 @@ input:focus {
   font-size: 0.8rem;
 }
 
+.drive-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .stats-grid {
   display: grid;
   margin: 1.35rem 0;
@@ -1016,8 +1022,13 @@ legend {
     flex-wrap: wrap;
   }
 
-  .drive-card .button {
+  .drive-card > .button,
+  .drive-card-actions {
     width: 100%;
+  }
+
+  .drive-card-actions .button {
+    flex: 1;
   }
 
   .stats-grid {

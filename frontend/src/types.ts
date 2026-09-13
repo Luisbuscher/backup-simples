@@ -7,6 +7,7 @@ export interface DatabaseTarget {
   port: number;
   databaseName: string;
   username: string;
+  driveFolderId: string | null;
   schedule: {
     enabled: boolean;
     days: WeekDay[];
@@ -39,6 +40,7 @@ export interface DatabasePayload {
   database: string;
   username: string;
   password?: string;
+  driveFolderId: string | null;
   schedule: {
     enabled: boolean;
     days: WeekDay[];

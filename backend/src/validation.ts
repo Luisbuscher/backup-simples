@@ -38,6 +38,13 @@ const baseDatabaseSchema = z.object({
   port: z.coerce.number().int().min(1).max(65535),
   database: z.string().trim().min(1).max(120),
   username: z.string().trim().min(1).max(120),
+  driveFolderId: z
+    .string()
+    .trim()
+    .max(255)
+    .nullable()
+    .optional()
+    .transform((value) => value || null),
   schedule: scheduleSchema,
 });
 

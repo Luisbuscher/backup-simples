@@ -461,9 +461,23 @@ function Dashboard({
             </span>
           </div>
           {drive.connected ? (
-            <button className="button button-quiet" disabled={driveBusy} onClick={disconnectDrive}>
-              Desconectar
-            </button>
+            <div className="drive-card-actions">
+              <button
+                className="button button-secondary"
+                disabled={driveBusy}
+                onClick={connectDrive}
+              >
+                {driveBusy && <LoaderCircle className="spin" size={17} />}
+                Reconectar
+              </button>
+              <button
+                className="button button-quiet"
+                disabled={driveBusy}
+                onClick={disconnectDrive}
+              >
+                Desconectar
+              </button>
+            </div>
           ) : (
             <button className="button button-primary" disabled={driveBusy} onClick={connectDrive}>
               {driveBusy && <LoaderCircle className="spin" size={17} />}
@@ -544,7 +558,9 @@ function Dashboard({
                       <span className="meta-label">Google Drive</span>
                       <span>
                         <Cloud size={14} />
-                        Pasta Backup Simples
+                        {database.driveFolderId
+                          ? "Pasta específica"
+                          : "Pasta Backup Simples"}
                       </span>
                     </div>
                     <div className="row-actions">
@@ -636,6 +652,7 @@ function DatabaseModal({
     database: database?.databaseName ?? "",
     username: database?.username ?? "",
     password: "",
+    driveFolderId: database?.driveFolderId ?? "",
     schedule: {
       enabled: database?.schedule.enabled ?? false,
       days: database?.schedule.days ?? [],
@@ -671,6 +688,7 @@ function DatabaseModal({
     try {
       const payload: DatabasePayload = {
         ...form,
+        driveFolderId: form.driveFolderId?.trim() || null,
         schedule: {
           ...form.schedule,
           time: form.schedule.enabled ? form.schedule.time : null,
@@ -787,6 +805,27 @@ function DatabaseModal({
                 )}
               </label>
             </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Destino no Google Drive</legend>
+            <label>
+              ID da pasta (opcional)
+              <input
+                value={form.driveFolderId ?? ""}
+                onChange={(event) =>
+                  setField("driveFolderId", event.target.value)
+                }
+                placeholder="Vazio: usar a pasta Backup Simples"
+                maxLength={255}
+              />
+              <span className="field-help">
+                Encontre o ID depois de <strong>/folders/</strong> na URL do
+                Google Drive. A conta conectada precisa ter permissão para
+                adicionar arquivos nessa pasta. Se a conexão for anterior a
+                esta opção, use <strong>Reconectar</strong> no painel.
+              </span>
+            </label>
           </fieldset>
 
           <fieldset>

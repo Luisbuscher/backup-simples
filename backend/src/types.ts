@@ -44,6 +44,7 @@ export interface DatabaseInput {
   database: string;
   username: string;
   password?: string;
+  driveFolderId: string | null;
   schedule: Schedule;
 }
 

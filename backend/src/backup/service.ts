@@ -67,7 +67,8 @@ export class BackupService {
         startedAt,
         this.options.config.timeZone,
       );
-      const driveFolderId = driveConnection.rootFolderId;
+      const driveFolderId =
+        target.driveFolderId ?? driveConnection.rootFolderId;
       const runInput: BackupRunCreate = {
         userId,
         databaseId: target.id,
@@ -109,6 +110,7 @@ export class BackupService {
 
     try {
       await driveUploader.verifyAccess?.();
+      await driveUploader.verifyFolderAccess?.(run.driveFolderId);
       await mkdir(this.tempRoot, { recursive: true });
       runDirectory = await mkdtemp(join(this.tempRoot, `${run.id}-`));
       const outputPath = join(runDirectory, run.fileName);

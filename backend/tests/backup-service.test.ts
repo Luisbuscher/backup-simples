@@ -135,6 +135,32 @@ describe("BackupService", () => {
     expect(await readdir(root)).toEqual([]);
   });
 
+  it("prioriza a pasta específica configurada no banco", async () => {
+    const database = target();
+    database.driveFolderId = "custom-folder";
+    const repository = new FakeRepository(database);
+    const root = await mkdtemp(join(tmpdir(), "backup-service-test-"));
+    roots.push(root);
+    const upload = vi.fn(async () => "drive-file-id");
+    const service = new BackupService({
+      repository,
+      dumpRunner: async (_target, output) => writeFile(output, "dump"),
+      driveUploaderFactory: () => upload,
+      config: { timeZone: "America/Sao_Paulo" },
+      tempRoot: root,
+      logger: { error: vi.fn() },
+    });
+
+    const run = await service.start(database.id, database.userId, "manual");
+    expect(run?.driveFolderId).toBe("custom-folder");
+    await waitUntil(() => repository.runs[0].status !== "running");
+    expect(upload).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      "custom-folder",
+    );
+  });
+
   it("registra erro sanitizado e também limpa o temporário", async () => {
     const database = target();
     const repository = new FakeRepository(database);
