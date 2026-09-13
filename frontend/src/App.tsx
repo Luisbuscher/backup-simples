@@ -4,7 +4,6 @@ import {
   Cloud,
   Clock3,
   Database,
-  HardDriveUpload,
   LoaderCircle,
   LogOut,
   Pencil,
@@ -68,7 +67,12 @@ function PageLoader() {
   return (
     <main className="page-loader" aria-label="Carregando aplicação">
       <div className="brand-mark">
-        <HardDriveUpload size={25} />
+        <img
+          className="brand-logo"
+          src="/logo-backup-simples.png"
+          alt=""
+          aria-hidden="true"
+        />
       </div>
       <LoaderCircle className="spin" size={24} />
     </main>
@@ -144,7 +148,12 @@ function Login({ onAuthenticated }: { onAuthenticated: (user: AuthUser) => void 
         <div className="login-intro">
           <div className="brand-line">
             <div className="brand-mark brand-mark-light">
-              <HardDriveUpload size={25} />
+              <img
+                className="brand-logo"
+                src="/logo-backup-simples.png"
+                alt=""
+                aria-hidden="true"
+              />
             </div>
             <span>Backup Simples</span>
           </div>
@@ -415,7 +424,12 @@ function Dashboard({
       <header className="topbar">
         <div className="brand-line brand-line-dark">
           <div className="brand-mark">
-            <HardDriveUpload size={23} />
+            <img
+              className="brand-logo"
+              src="/logo-backup-simples.png"
+              alt=""
+              aria-hidden="true"
+            />
           </div>
           <div>
             <strong>Backup Simples</strong>
