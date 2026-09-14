@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
 });
 
@@ -68,5 +69,65 @@ describe("App", () => {
     expect(await screen.findByText(/Conta criada/)).toBeInTheDocument();
     const registerCall = fetchMock.mock.calls.find(([url]) => String(url) === "/api/auth/register");
     expect(registerCall).toBeDefined();
+  });
+
+  it("filtra os backups recentes por quantidade e banco", async () => {
+    const database = {
+      id: "625c730e-bfee-4333-8c84-03c8faf5cf50",
+      name: "Produção",
+      host: "db.example.com",
+      port: 5432,
+      databaseName: "app",
+      username: "postgres",
+      hasPassword: true,
+      driveFolderId: null,
+      schedule: { enabled: false, days: [], time: null },
+      createdAt: "2026-09-13T10:00:00.000Z",
+      updatedAt: "2026-09-13T10:00:00.000Z",
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const path = String(input);
+      if (path === "/api/auth/me") {
+        return jsonResponse({
+          user: { id: "user-1", firstName: "Ana", lastName: "Silva", email: "ana@example.com" },
+        });
+      }
+      if (path === "/api/databases") return jsonResponse([database]);
+      if (path.startsWith("/api/backups")) return jsonResponse([]);
+      if (path === "/api/google/status") {
+        return jsonResponse({ connected: false, email: null, connectedAt: null });
+      }
+      throw new Error(`URL inesperada: ${path}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    const quantity = await screen.findByLabelText("Quantidade");
+    expect(quantity).toHaveValue("10");
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/backups?limit=10",
+        expect.anything(),
+      ),
+    );
+
+    fireEvent.change(quantity, { target: { value: "25" } });
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/backups?limit=25",
+        expect.anything(),
+      ),
+    );
+
+    fireEvent.change(screen.getByLabelText("Banco"), {
+      target: { value: database.id },
+    });
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/backups?limit=25&databaseId=${database.id}`,
+        expect.anything(),
+      ),
+    );
   });
 });

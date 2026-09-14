@@ -21,6 +21,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { api, ApiError } from "./api";
@@ -42,6 +43,9 @@ const DAYS: { value: WeekDay; short: string; long: string }[] = [
   { value: "sat", short: "Sáb", long: "Sábado" },
   { value: "sun", short: "Dom", long: "Domingo" },
 ];
+
+const BACKUP_LIMIT_OPTIONS = [10, 25, 50] as const;
+type BackupLimit = (typeof BACKUP_LIMIT_OPTIONS)[number];
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Ocorreu um erro inesperado";
@@ -279,6 +283,11 @@ function Dashboard({
 }) {
   const [databases, setDatabases] = useState<DatabaseTarget[]>([]);
   const [backups, setBackups] = useState<BackupRun[]>([]);
+  const [recentBackups, setRecentBackups] = useState<BackupRun[]>([]);
+  const [backupLimit, setBackupLimit] = useState<BackupLimit>(10);
+  const [backupDatabaseId, setBackupDatabaseId] = useState("");
+  const [recentBackupsLoading, setRecentBackupsLoading] = useState(true);
+  const recentBackupsRequest = useRef(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState(() => {
     const googleResult = new URLSearchParams(window.location.search).get("google");
@@ -319,16 +328,49 @@ function Dashboard({
     [onLoggedOut],
   );
 
+  const loadRecentBackups = useCallback(
+    async (quiet = false) => {
+      const requestId = ++recentBackupsRequest.current;
+      if (!quiet) setRecentBackupsLoading(true);
+      const query = new URLSearchParams({ limit: String(backupLimit) });
+      if (backupDatabaseId) query.set("databaseId", backupDatabaseId);
+      try {
+        const data = await api<BackupRun[]>(`/api/backups?${query}`);
+        if (requestId === recentBackupsRequest.current) setRecentBackups(data);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) {
+          onLoggedOut();
+          return;
+        }
+        if (requestId === recentBackupsRequest.current) {
+          setMessage(errorMessage(error));
+        }
+      } finally {
+        if (requestId === recentBackupsRequest.current) {
+          setRecentBackupsLoading(false);
+        }
+      }
+    },
+    [backupDatabaseId, backupLimit, onLoggedOut],
+  );
+
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    void loadRecentBackups();
+  }, [loadRecentBackups]);
+
   const hasRunning = backups.some((backup) => backup.status === "running");
   useEffect(() => {
     if (!hasRunning) return;
-    const timer = window.setInterval(() => void loadData(true), 4_000);
+    const timer = window.setInterval(
+      () => void Promise.all([loadData(true), loadRecentBackups(true)]),
+      4_000,
+    );
     return () => window.clearInterval(timer);
-  }, [hasRunning, loadData]);
+  }, [hasRunning, loadData, loadRecentBackups]);
 
   const activeSchedules = databases.filter(
     (database) => database.schedule.enabled,
@@ -345,7 +387,7 @@ function Dashboard({
     setMessage("");
     try {
       await api(`/api/databases/${database.id}/backups`, { method: "POST" });
-      await loadData(true);
+      await Promise.all([loadData(true), loadRecentBackups(true)]);
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {
@@ -396,7 +438,12 @@ function Dashboard({
     setMessage("");
     try {
       await api(`/api/databases/${database.id}`, { method: "DELETE" });
-      await loadData(true);
+      if (backupDatabaseId === database.id) {
+        setBackupDatabaseId("");
+        await loadData(true);
+      } else {
+        await Promise.all([loadData(true), loadRecentBackups(true)]);
+      }
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {
@@ -616,22 +663,62 @@ function Dashboard({
         </section>
 
         <section className="panel">
-          <div className="panel-heading">
+          <div className="panel-heading backup-panel-heading">
             <div>
               <h2>Backups recentes</h2>
-              <p>Últimas 50 execuções registradas.</p>
+              <p>
+                Até {backupLimit} execuções
+                {backupDatabaseId
+                  ? ` de ${databases.find((database) => database.id === backupDatabaseId)?.name ?? "um banco"}`
+                  : " registradas"}.
+              </p>
+            </div>
+            <div className="backup-filters" aria-label="Filtros de backups recentes">
+              <label className="backup-filter">
+                Banco
+                <select
+                  value={backupDatabaseId}
+                  onChange={(event) => setBackupDatabaseId(event.target.value)}
+                >
+                  <option value="">Todos os bancos</option>
+                  {databases.map((database) => (
+                    <option key={database.id} value={database.id}>
+                      {database.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="backup-filter backup-limit-filter">
+                Quantidade
+                <select
+                  value={backupLimit}
+                  onChange={(event) =>
+                    setBackupLimit(Number(event.target.value) as BackupLimit)
+                  }
+                >
+                  {BACKUP_LIMIT_OPTIONS.map((limit) => (
+                    <option key={limit} value={limit}>
+                      Últimos {limit}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
-          {loading ? (
+          {loading || recentBackupsLoading ? (
             <SectionLoader />
-          ) : backups.length === 0 ? (
+          ) : recentBackups.length === 0 ? (
             <EmptyState
               icon={<Clock3 size={25} />}
-              title="Ainda não há backups"
-              text="As execuções manuais e agendadas aparecerão aqui."
+              title={backupDatabaseId ? "Nenhum backup encontrado" : "Ainda não há backups"}
+              text={
+                backupDatabaseId
+                  ? "Não há execuções registradas para o banco selecionado."
+                  : "As execuções manuais e agendadas aparecerão aqui."
+              }
             />
           ) : (
-            <BackupTable backups={backups} />
+            <BackupTable backups={recentBackups} />
           )}
         </section>
       </main>

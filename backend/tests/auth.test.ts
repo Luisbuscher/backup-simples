@@ -132,4 +132,19 @@ describe("authentication", () => {
     expect(JSON.stringify(response.body)).not.toContain(database.password);
     expect(JSON.stringify(response.body)).not.toContain(database.userId);
   });
+
+  it("lista 10 backups por padrão e aceita filtros de quantidade e banco", async () => {
+    const listBackups = vi.fn(async () => []);
+    const app = testApp({ listBackups });
+    const agent = await authenticatedAgent(app);
+
+    expect((await agent.get("/api/backups")).status).toBe(200);
+    expect(listBackups).toHaveBeenLastCalledWith(USER_ID, 10, undefined);
+
+    const databaseId = target().id;
+    expect(
+      (await agent.get(`/api/backups?limit=25&databaseId=${databaseId}`)).status,
+    ).toBe(200);
+    expect(listBackups).toHaveBeenLastCalledWith(USER_ID, 25, databaseId);
+  });
 });

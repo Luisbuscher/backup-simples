@@ -278,8 +278,9 @@ export function createApp({
 
   app.get("/api/backups", async (request, response) => {
     const user = authenticatedUser(response);
-    const limit = z.coerce.number().int().min(1).max(100).default(50).parse(request.query.limit);
-    const backups = await repository.listBackups(user.id, limit);
+    const limit = z.coerce.number().int().min(1).max(100).default(10).parse(request.query.limit);
+    const databaseId = uuidSchema.optional().parse(request.query.databaseId);
+    const backups = await repository.listBackups(user.id, limit, databaseId);
     response.json(backups.map(toPublicBackup));
   });
 

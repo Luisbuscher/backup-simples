@@ -298,11 +298,12 @@ export class AppRepository implements BackupRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
-  async listBackups(userId: string, limit: number) {
+  async listBackups(userId: string, limit: number, databaseId?: string) {
+    const databaseFilter = databaseId ? " AND database_id = $3" : "";
     const result = await this.pool.query<BackupRow>(
       `SELECT * FROM backup_history
-       WHERE user_id = $1 ORDER BY started_at DESC LIMIT $2`,
-      [userId, limit],
+       WHERE user_id = $1${databaseFilter} ORDER BY started_at DESC LIMIT $2`,
+      databaseId ? [userId, limit, databaseId] : [userId, limit],
     );
     return result.rows.map(mapBackup);
   }
